@@ -16,7 +16,6 @@ $totalMembers = $stmt->fetchColumn();
 
 // ========================================
 // ACTIVE MEMBERS
-// Expiration date is today or later
 // ========================================
 
 $stmt = $pdo->query("
@@ -85,31 +84,57 @@ $recentMembers = $stmt->fetchAll();
 
 ?>
 
-<?php require_once "includes/header.php"; ?>
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Dashboard | ONYX GYM</title>
+
+    <link rel="stylesheet" href="css/style.css">
+
+</head>
+
+
+<body>
+
 
 <?php require_once "includes/sidebar.php"; ?>
 
 
 <main class="main-content">
 
+
     <!-- TOP HEADER -->
 
     <header class="top-header">
 
         <div>
-            <h1>Dashboard</h1>
+
+            <span class="page-label">
+                ONYX GYM
+            </span>
+
+            <h1>
+                Dashboard
+            </h1>
 
             <p>
                 Welcome back,
-                <strong><?= htmlspecialchars($_SESSION["username"]) ?></strong>
+                <strong>
+                    <?= htmlspecialchars($_SESSION["username"]) ?>
+                </strong>
             </p>
-        </div>
 
-        <div class="header-brand">
-            ONYX GYM
         </div>
 
     </header>
+
 
 
     <!-- STATISTICS -->
@@ -127,7 +152,9 @@ $recentMembers = $stmt->fetchAll();
 
             <div>
 
-                <p>Total Members</p>
+                <p>
+                    Total Members
+                </p>
 
                 <h2>
                     <?= number_format($totalMembers) ?>
@@ -136,6 +163,7 @@ $recentMembers = $stmt->fetchAll();
             </div>
 
         </div>
+
 
 
         <!-- ACTIVE MEMBERS -->
@@ -148,7 +176,9 @@ $recentMembers = $stmt->fetchAll();
 
             <div>
 
-                <p>Active Members</p>
+                <p>
+                    Active Members
+                </p>
 
                 <h2>
                     <?= number_format($activeMembers) ?>
@@ -157,6 +187,7 @@ $recentMembers = $stmt->fetchAll();
             </div>
 
         </div>
+
 
 
         <!-- EXPIRED MEMBERS -->
@@ -169,7 +200,9 @@ $recentMembers = $stmt->fetchAll();
 
             <div>
 
-                <p>Expired Members</p>
+                <p>
+                    Expired Members
+                </p>
 
                 <h2>
                     <?= number_format($expiredMembers) ?>
@@ -178,6 +211,7 @@ $recentMembers = $stmt->fetchAll();
             </div>
 
         </div>
+
 
 
         <!-- TODAY ATTENDANCE -->
@@ -190,7 +224,9 @@ $recentMembers = $stmt->fetchAll();
 
             <div>
 
-                <p>Today's Attendance</p>
+                <p>
+                    Today's Attendance
+                </p>
 
                 <h2>
                     <?= number_format($todayAttendance) ?>
@@ -199,6 +235,7 @@ $recentMembers = $stmt->fetchAll();
             </div>
 
         </div>
+
 
 
         <!-- TOTAL PAYMENTS -->
@@ -211,7 +248,9 @@ $recentMembers = $stmt->fetchAll();
 
             <div>
 
-                <p>Total Payments</p>
+                <p>
+                    Total Payments
+                </p>
 
                 <h2>
                     ₱<?= number_format($totalPayments, 2) ?>
@@ -225,28 +264,40 @@ $recentMembers = $stmt->fetchAll();
     </section>
 
 
+
     <!-- RECENT MEMBERS -->
 
     <section class="dashboard-section">
+
 
         <div class="section-header">
 
             <div>
 
-                <h2>Recently Registered Members</h2>
+                <h2>
+                    Recently Registered Members
+                </h2>
 
-                <p>Latest members added to the system.</p>
+                <p>
+                    Latest members added to the system.
+                </p>
 
             </div>
 
-            <a href="/onyx-gym/members/index.php" class="view-all">
+
+            <a
+                href="/onyx-gym/members/index.php"
+                class="view-all"
+            >
                 View All
             </a>
 
         </div>
 
 
+
         <div class="table-container">
+
 
             <table>
 
@@ -254,13 +305,21 @@ $recentMembers = $stmt->fetchAll();
 
                     <tr>
 
-                        <th>Member</th>
+                        <th>
+                            Member
+                        </th>
 
-                        <th>Membership</th>
+                        <th>
+                            Membership
+                        </th>
 
-                        <th>Status</th>
+                        <th>
+                            Status
+                        </th>
 
-                        <th>Expiration</th>
+                        <th>
+                            Expiration
+                        </th>
 
                     </tr>
 
@@ -269,9 +328,12 @@ $recentMembers = $stmt->fetchAll();
 
                 <tbody>
 
+
                 <?php if (count($recentMembers) > 0): ?>
 
+
                     <?php foreach ($recentMembers as $member): ?>
+
 
                         <?php
 
@@ -282,7 +344,9 @@ $recentMembers = $stmt->fetchAll();
 
                         ?>
 
+
                         <tr>
+
 
                             <td>
 
@@ -298,11 +362,14 @@ $recentMembers = $stmt->fetchAll();
 
 
                             <td>
+
                                 <?= htmlspecialchars($member["membership_plan"]) ?>
+
                             </td>
 
 
                             <td>
+
 
                                 <?php if ($status === "ACTIVE"): ?>
 
@@ -318,39 +385,51 @@ $recentMembers = $stmt->fetchAll();
 
                                 <?php endif; ?>
 
+
                             </td>
 
 
                             <td>
+
                                 <?= date(
                                     "M d, Y",
                                     strtotime($member["expiration_date"])
                                 ) ?>
+
                             </td>
+
 
                         </tr>
 
+
                     <?php endforeach; ?>
+
 
                 <?php else: ?>
 
+
                     <tr>
 
-                        <td colspan="4" class="empty-table">
-
+                        <td
+                            colspan="4"
+                            class="empty-table"
+                        >
                             No members registered yet.
-
                         </td>
 
                     </tr>
 
+
                 <?php endif; ?>
+
 
                 </tbody>
 
             </table>
 
+
         </div>
+
 
     </section>
 
@@ -358,4 +437,6 @@ $recentMembers = $stmt->fetchAll();
 </main>
 
 
-<?php require_once "includes/footer.php"; ?>
+</body>
+
+</html>

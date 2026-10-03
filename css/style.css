@@ -57,7 +57,7 @@ a {
 .logo {
     color: #e5b82e;
 
-    font-size: 28px;
+    font-size: 20px;
 
     font-weight: bold;
 
@@ -65,7 +65,7 @@ a {
 
     text-align: center;
 
-    margin-bottom: 25px;
+    margin-bottom: 0px;
 }
 
 .logo span {
@@ -78,9 +78,9 @@ a {
 .login-container h1 {
     text-align: center;
 
-    margin-bottom: 8px;
+    margin-bottom: 0px;
 
-    font-size: 28px;
+    font-size: 18px;
 }
 
 .subtitle {
