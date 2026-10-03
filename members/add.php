@@ -2,12 +2,12 @@
 
 require_once "../includes/auth.php";
 require_once "../config/database.php";
+
 $membershipPlans = require "../config/plans.php";
 
 $pageTitle = "Add Member";
 
 $error = "";
-
 
 // ========================================
 // PROCESS FORM
@@ -413,4 +413,6 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 </main>
 
 
-<?php require_once "../includes/footer.php"; ?>
+
+</body>
+</html>

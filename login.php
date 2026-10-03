@@ -93,9 +93,7 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
 
         <h1>Admin Login</h1>
 
-        <p class="subtitle">
-            Sign in to manage ONYX GYM.
-        </p>
+        
 
 
         <?php if (!empty($error)): ?>
@@ -178,6 +176,10 @@ if ($_SERVER["REQUEST_METHOD"] === "POST") {
             </button>
 
         </form>
+         <p class="subtitle">
+            Sign in to manage ONYX GYM.
+        </p>
+
 
 
       
