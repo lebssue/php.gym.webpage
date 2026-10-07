@@ -84,17 +84,65 @@ $currentFolder = basename(dirname($_SERVER["PHP_SELF"]));
             <span>Attendance</span>
         </a>
 
-        <!-- PAYMENT REPORTS -->
+                <!-- PAYMENT REPORTS -->
         <a
-    href="/onyx-gym/payments/index.php"
-    class="<?= $currentFolder === 'payments' ? 'active' : '' ?>"
->
-    <span class="nav-icon">₱</span>
-    <span>Payments</span>
-</a>
+            href="/onyx-gym/payments/index.php"
+            class="<?= $currentFolder === 'payments' ? 'active' : '' ?>"
+        >
+            <span class="nav-icon">₱</span>
+            <span>Payments</span>
+        </a>
+
+
+        <!-- REPORTS -->
+        <a
+            href="/onyx-gym/reports/index.php"
+            class="<?= $currentFolder === 'reports' ? 'active' : '' ?>"
+        >
+            <span class="nav-icon">
+
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                >
+
+                    <line
+                        x1="18"
+                        y1="20"
+                        x2="18"
+                        y2="10"
+                    />
+
+                    <line
+                        x1="12"
+                        y1="20"
+                        x2="12"
+                        y2="4"
+                    />
+
+                    <line
+                        x1="6"
+                        y1="20"
+                        x2="6"
+                        y2="14"
+                    />
+
+                </svg>
+
+            </span>
+
+            <span>Reports</span>
+
+        </a>
 
     </nav>
-
 
     <!-- BOTTOM -->
     <div class="sidebar-bottom">

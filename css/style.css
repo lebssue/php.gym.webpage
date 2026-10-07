@@ -263,7 +263,7 @@ a {
 ======================================== */
 
 .sidebar {
-    width: 240px;
+    width: 230px;
 
     min-height: 100vh;
 
@@ -355,11 +355,19 @@ a {
 }
 
 .nav-icon {
+    width: 24px;
+    height: 24px;
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    flex-shrink: 0;
+}
+
+.nav-icon svg {
     width: 20px;
-
-    text-align: center;
-
-    font-size: 16px;
+    height: 20px;
 }
 
 
@@ -383,13 +391,83 @@ a {
 ======================================== */
 
 .main-content {
-    margin-left: 240px;
+    margin-left: 230px;
+    width: calc(100% - 230px);
+    min-height: 100vh;
+    padding: 35px 40px;
+    box-sizing: border-box;
+}
 
-    width: calc(100% - 240px);
-
+.form-section {
+    background: #111;
+    border: 1px solid #292929;
+    border-radius: 8px;
     padding: 30px;
 }
 
+.member-form {
+    width: 100%;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.form-group label {
+    color: #ccc;
+    font-size: 13px;
+}
+
+.form-group input,
+.form-group select {
+    width: 100%;
+    padding: 12px;
+    box-sizing: border-box;
+    background: #0b0b0b;
+    color: #fff;
+    border: 1px solid #333;
+    border-radius: 6px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: #e5b82e;
+    outline: none;
+}
+
+.form-grid .full-width {
+    grid-column: 1 / -1;
+}
+
+.member-form h2 {
+    color: #fff;
+    margin-bottom: 20px;
+}
+
+.form-heading {
+    margin-top: 35px;
+}
+
+.form-note {
+    margin-top: 20px;
+    color: #777;
+    font-size: 12px;
+}
+
+.form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    margin-top: 30px;
+}
 
 /* ========================================
    TOP HEADER
