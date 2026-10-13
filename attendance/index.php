@@ -5,186 +5,259 @@ require_once "../config/database.php";
 
 $pageTitle = "Attendance";
 
-$search = trim($_GET["search"] ?? "");
-
-$member = null;
-$attendanceHistory = [];
 $message = "";
 $messageType = "";
 
 
-// =====================================================
-// SEARCH MEMBER
-// =====================================================
+/*
+|--------------------------------------------------------------------------
+| CHECK-IN FUNCTION
+|--------------------------------------------------------------------------
+*/
+
+function checkInMember($pdo, $memberId)
+{
+    $memberId = trim($memberId);
+
+    /*
+    | Allow QR codes such as:
+    | 25
+    | ONYX-MEMBER-25
+    */
+
+    if (preg_match('/^ONYX-MEMBER-(\d+)$/i', $memberId, $matches)) {
+        $memberId = $matches[1];
+    }
+
+    if (!ctype_digit($memberId) || (int)$memberId <= 0) {
+        return [
+            "success" => false,
+            "message" => "Invalid member ID."
+        ];
+    }
+
+    $memberId = (int)$memberId;
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | FIND MEMBER
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->prepare("
+        SELECT
+            id,
+            full_name,
+            membership_plan,
+            expiration_date
+        FROM members
+        WHERE id = ?
+        LIMIT 1
+    ");
+
+    $stmt->execute([$memberId]);
+
+    $member = $stmt->fetch();
+
+    if (!$member) {
+        return [
+            "success" => false,
+            "message" => "Member ID #{$memberId} was not found."
+        ];
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | CHECK MEMBERSHIP STATUS
+    |--------------------------------------------------------------------------
+    */
+
+    if ($member["expiration_date"] < date("Y-m-d")) {
+
+        return [
+            "success" => false,
+            "message" =>
+                htmlspecialchars($member["full_name"]) .
+                " has an expired membership."
+        ];
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | PREVENT DUPLICATE ATTENDANCE
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->prepare("
+        SELECT id
+        FROM attendance
+        WHERE member_id = ?
+        AND attendance_date = CURDATE()
+        LIMIT 1
+    ");
+
+    $stmt->execute([$memberId]);
+
+    if ($stmt->fetch()) {
+
+        return [
+            "success" => false,
+            "message" =>
+                htmlspecialchars($member["full_name"]) .
+                " is already checked in today."
+        ];
+    }
+
+
+    /*
+    |--------------------------------------------------------------------------
+    | RECORD ATTENDANCE
+    |--------------------------------------------------------------------------
+    */
+
+    $stmt = $pdo->prepare("
+        INSERT INTO attendance
+        (
+            member_id,
+            attendance_date,
+            attendance_time
+        )
+        VALUES
+        (
+            ?,
+            CURDATE(),
+            CURTIME()
+        )
+    ");
+
+    $stmt->execute([$memberId]);
+
+
+    return [
+        "success" => true,
+        "message" =>
+            htmlspecialchars($member["full_name"]) .
+            " successfully checked in!",
+        "member" => $member
+    ];
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| QUICK CHECK-IN / QR SCANNER REQUEST
+|--------------------------------------------------------------------------
+*/
+
+if ($_SERVER["REQUEST_METHOD"] === "POST") {
+
+    $action = $_POST["action"] ?? "";
+
+    if ($action === "checkin") {
+
+        $memberId = $_POST["member_id"] ?? "";
+
+        $result = checkInMember(
+            $pdo,
+            $memberId
+        );
+
+
+        /*
+        | QR / JavaScript request
+        */
+
+        if (
+            isset($_POST["ajax"]) &&
+            $_POST["ajax"] === "1"
+        ) {
+
+            header("Content-Type: application/json");
+
+            echo json_encode($result);
+
+            exit;
+        }
+
+
+        /*
+        | Normal form request
+        */
+
+        $message = $result["message"];
+
+        $messageType =
+            $result["success"]
+                ? "success"
+                : "error";
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| SEARCH MEMBER
+|--------------------------------------------------------------------------
+*/
+
+$search = trim($_GET["search"] ?? "");
+
+$searchResults = [];
 
 if ($search !== "") {
 
     $stmt = $pdo->prepare("
-        SELECT *
+        SELECT
+            id,
+            full_name,
+            membership_plan,
+            expiration_date
         FROM members
-        WHERE id = ?
-           OR full_name LIKE ?
-           OR contact LIKE ?
+        WHERE
+            full_name LIKE ?
+            OR id LIKE ?
+            OR contact LIKE ?
         ORDER BY full_name ASC
-        LIMIT 1
+        LIMIT 20
     ");
 
+    $searchTerm = "%" . $search . "%";
+
     $stmt->execute([
-        is_numeric($search) ? $search : 0,
-        "%" . $search . "%",
-        "%" . $search . "%"
+        $searchTerm,
+        $searchTerm,
+        $searchTerm
     ]);
 
-    $member = $stmt->fetch();
-
+    $searchResults = $stmt->fetchAll();
 }
 
 
-// =====================================================
-// CHECK IN
-// =====================================================
-
-if ($_SERVER["REQUEST_METHOD"] === "POST") {
-
-    $memberId = filter_input(
-        INPUT_POST,
-        "member_id",
-        FILTER_VALIDATE_INT
-    );
-
-
-    if (!$memberId) {
-
-        $message = "Invalid member.";
-        $messageType = "error";
-
-    } else {
-
-        // ---------------------------------------------
-        // GET MEMBER
-        // ---------------------------------------------
-
-        $stmt = $pdo->prepare("
-            SELECT *
-            FROM members
-            WHERE id = ?
-        ");
-
-        $stmt->execute([$memberId]);
-
-        $member = $stmt->fetch();
-
-
-        if (!$member) {
-
-            $message = "Member does not exist.";
-            $messageType = "error";
-
-        } else {
-
-            $today = date("Y-m-d");
-
-
-            // ---------------------------------------------
-            // CHECK MEMBERSHIP STATUS
-            // ---------------------------------------------
-
-            if ($member["expiration_date"] < $today) {
-
-                $message = "This member's membership has expired. Check-in is not allowed.";
-                $messageType = "error";
-
-            } else {
-
-                // ---------------------------------------------
-                // CHECK DUPLICATE ATTENDANCE
-                // ---------------------------------------------
-
-                $stmt = $pdo->prepare("
-                    SELECT id
-                    FROM attendance
-                    WHERE member_id = ?
-                    AND attendance_date = ?
-                    LIMIT 1
-                ");
-
-                $stmt->execute([
-                    $memberId,
-                    $today
-                ]);
-
-                $existingAttendance = $stmt->fetch();
-
-
-                if ($existingAttendance) {
-
-                    $message = "This member has already checked in today.";
-                    $messageType = "error";
-
-                } else {
-
-                    // ---------------------------------------------
-                    // RECORD ATTENDANCE
-                    // ---------------------------------------------
-
-                    $currentTime = date("H:i:s");
-
-                    $stmt = $pdo->prepare("
-                        INSERT INTO attendance
-                        (
-                            member_id,
-                            attendance_date,
-                            attendance_time
-                        )
-                        VALUES (?, ?, ?)
-                    ");
-
-                    $stmt->execute([
-                        $memberId,
-                        $today,
-                        $currentTime
-                    ]);
-
-
-                    $message =
-                        $member["full_name"] .
-                        " successfully checked in.";
-
-                    $messageType = "success";
-
-                }
-
-            }
-
-        }
-
-    }
-
-}
-
-
-// =====================================================
-// LOAD ATTENDANCE HISTORY
-// =====================================================
+/*
+|--------------------------------------------------------------------------
+| ATTENDANCE HISTORY
+|--------------------------------------------------------------------------
+*/
 
 $stmt = $pdo->query("
     SELECT
         attendance.id,
+        attendance.member_id,
         attendance.attendance_date,
         attendance.attendance_time,
-        members.id AS member_id,
         members.full_name,
         members.membership_plan
     FROM attendance
-
     INNER JOIN members
         ON attendance.member_id = members.id
-
     ORDER BY
         attendance.attendance_date DESC,
-        attendance.attendance_time DESC
-
-    LIMIT 100
+        attendance.attendance_time DESC,
+        attendance.id DESC
+    LIMIT 50
 ");
 
 $attendanceHistory = $stmt->fetchAll();
@@ -203,18 +276,18 @@ $attendanceHistory = $stmt->fetchAll();
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>Attendance | ONYX GYM</title>
+    <title>
+        Attendance | ONYX GYM
+    </title>
 
     <link
         rel="stylesheet"
-        href="/onyx-gym/css/style.css"
+        href="../css/style.css"
     >
 
 </head>
 
-
 <body>
-
 
 <?php require_once "../includes/sidebar.php"; ?>
 
@@ -222,15 +295,15 @@ $attendanceHistory = $stmt->fetchAll();
 <main class="main-content">
 
 
-    <!-- =================================================
-         HEADER
-    ================================================== -->
+    <!-- PAGE HEADER -->
 
-    <div class="top-header">
+    <div class="page-header">
 
         <div>
 
-            <h1>Attendance</h1>
+            <h1>
+                Attendance
+            </h1>
 
             <p>
                 Search members and record gym check-ins.
@@ -238,41 +311,39 @@ $attendanceHistory = $stmt->fetchAll();
 
         </div>
 
-        <div class="header-brand">
+        <div class="page-header-brand">
             ONYX GYM
         </div>
 
     </div>
 
 
-    <!-- =================================================
-         MESSAGE
-    ================================================== -->
+    <!-- MESSAGE -->
 
     <?php if ($message !== ""): ?>
 
-        <div class="<?= $messageType === "success"
-            ? "success-message"
-            : "error-message"
-        ?>">
-
-            <?= htmlspecialchars($message) ?>
-
+        <div
+            class="attendance-message <?= $messageType ?>"
+        >
+            <?= $message ?>
         </div>
 
     <?php endif; ?>
 
 
-    <!-- =================================================
-         SEARCH MEMBER
-    ================================================== -->
+    <!-- SEARCH MEMBER -->
 
-    <section class="dashboard-section">
-
+    <section class="dashboard-section attendance-search-section">
 
         <div class="section-header">
 
-            <h2>Search Member</h2>
+            <div>
+
+                <h2>
+                    Search Member
+                </h2>
+
+            </div>
 
             <p>
                 Search by member ID, name, or contact number.
@@ -281,236 +352,205 @@ $attendanceHistory = $stmt->fetchAll();
         </div>
 
 
-        <div class="attendance-search-area">
+        <form
+            method="GET"
+            class="attendance-search-form"
+        >
 
-
-            <form
-                method="GET"
-                class="search-form"
+            <input
+                type="text"
+                name="search"
+                placeholder="Enter member name, ID, or contact..."
+                value="<?= htmlspecialchars($search) ?>"
             >
 
-                <input
-                    type="text"
-                    name="search"
-                    placeholder="Enter member name, ID, or contact..."
-                    value="<?= htmlspecialchars($search) ?>"
-                    required
-                >
+            <button
+                type="submit"
+                class="attendance-search-button"
+            >
+                Search
+            </button>
 
-                <button type="submit">
-                    Search
-                </button>
-
-            </form>
+        </form>
 
 
-        </div>
+        <?php if ($search !== ""): ?>
 
+            <div class="attendance-search-results">
 
-    </section>
+                <?php if (empty($searchResults)): ?>
 
+                    <p class="attendance-empty">
+                        No members found.
+                    </p>
 
-    <!-- =================================================
-         MEMBER RESULT
-    ================================================== -->
+                <?php else: ?>
 
-    <?php if ($search !== ""): ?>
+                    <?php foreach ($searchResults as $member): ?>
 
+                        <?php
+                        $isActive =
+                            $member["expiration_date"] >= date("Y-m-d");
+                        ?>
 
-        <section class="dashboard-section">
-
-
-            <div class="section-header">
-
-                <h2>Member Result</h2>
-
-            </div>
-
-
-            <?php if ($member): ?>
-
-
-                <?php
-
-                $isActive =
-                    $member["expiration_date"] >= date("Y-m-d");
-
-                ?>
-
-
-                <div class="attendance-member-card">
-
-
-                    <div class="attendance-member-info">
-
-
-                        <span class="member-label">
-                            MEMBER
-                        </span>
-
-                        <h2>
-                            <?= htmlspecialchars($member["full_name"]) ?>
-                        </h2>
-
-
-                        <div class="member-details">
+                        <div class="member-checkin-card">
 
                             <div>
 
-                                <span>
-                                    Member ID
-                                </span>
-
                                 <strong>
-                                    #<?= htmlspecialchars($member["id"]) ?>
+                                    <?= htmlspecialchars($member["full_name"]) ?>
                                 </strong>
 
-                            </div>
-
-
-                            <div>
-
                                 <span>
-                                    Membership
+                                    ID #<?= htmlspecialchars($member["id"]) ?>
                                 </span>
 
-                                <strong>
+                                <span>
                                     <?= htmlspecialchars($member["membership_plan"]) ?>
-                                </strong>
-
-                            </div>
-
-
-                            <div>
-
-                                <span>
-                                    Expiration
                                 </span>
 
-                                <strong>
-                                    <?= date(
-                                        "M d, Y",
-                                        strtotime($member["expiration_date"])
-                                    ) ?>
-                                </strong>
-
                             </div>
 
 
-                            <div>
+                            <div class="member-checkin-right">
 
-                                <span>
-                                    Status
+                                <span
+                                    class="attendance-status
+                                    <?= $isActive ? "active" : "expired" ?>"
+                                >
+                                    <?= $isActive ? "ACTIVE" : "EXPIRED" ?>
                                 </span>
 
 
                                 <?php if ($isActive): ?>
 
-                                    <strong class="attendance-active">
-                                        ACTIVE
-                                    </strong>
+                                    <form
+                                        method="POST"
+                                        style="display:inline;"
+                                    >
 
-                                <?php else: ?>
+                                        <input
+                                            type="hidden"
+                                            name="action"
+                                            value="checkin"
+                                        >
 
-                                    <strong class="attendance-expired">
-                                        EXPIRED
-                                    </strong>
+                                        <input
+                                            type="hidden"
+                                            name="member_id"
+                                            value="<?= htmlspecialchars($member["id"]) ?>"
+                                        >
+
+                                        <button
+                                            type="submit"
+                                            class="checkin-button"
+                                        >
+                                            CHECK IN
+                                        </button>
+
+                                    </form>
 
                                 <?php endif; ?>
 
-
                             </div>
-
 
                         </div>
 
+                    <?php endforeach; ?>
 
-                    </div>
+                <?php endif; ?>
 
+            </div>
 
-                    <div class="attendance-checkin">
+        <?php endif; ?>
 
-
-                        <?php if ($isActive): ?>
-
-
-                            <form method="POST">
-
-                                <input
-                                    type="hidden"
-                                    name="member_id"
-                                    value="<?= htmlspecialchars($member["id"]) ?>"
-                                >
+    </section>
 
 
-                                <button
-                                    type="submit"
-                                    class="checkin-button"
-                                >
+    <!-- QUICK CHECK-IN -->
 
-                                    CHECK IN
-
-                                </button>
-
-                            </form>
-
-
-                        <?php else: ?>
-
-
-                            <button
-                                type="button"
-                                class="checkin-button disabled"
-                                disabled
-                            >
-
-                                EXPIRED
-
-                            </button>
-
-
-                        <?php endif; ?>
-
-
-                    </div>
-
-
-                </div>
-
-
-            <?php else: ?>
-
-
-                <div class="empty-table">
-
-                    No member found matching:
-
-                    <strong>
-                        <?= htmlspecialchars($search) ?>
-                    </strong>
-
-                </div>
-
-
-            <?php endif; ?>
-
-
-        </section>
-
-
-    <?php endif; ?>
-
-
-    <!-- =================================================
-         ATTENDANCE HISTORY
-    ================================================== -->
-
-    <section class="dashboard-section">
-
+    <section class="dashboard-section quick-checkin-section">
 
         <div class="section-header">
 
-            <h2>Attendance History</h2>
+            <div>
+
+                <h2>
+                    Quick Check-In
+                </h2>
+
+                <p>
+                    Enter a gym goer's ID number to record attendance.
+                </p>
+
+            </div>
+
+
+            <!-- SCAN BUTTON -->
+
+            <button
+                type="button"
+                id="openScanner"
+                class="scan-id-button"
+            >
+                <span>▣</span>
+                SCAN MEMBER ID
+            </button>
+
+        </div>
+
+
+        <form
+            id="quickCheckinForm"
+            class="quick-checkin-form"
+        >
+
+            <input
+                type="text"
+                id="memberIdInput"
+                name="member_id"
+                placeholder="Enter Gym Goer ID"
+                autocomplete="off"
+                inputmode="numeric"
+            >
+
+            <button
+                type="submit"
+                class="checkin-button"
+            >
+                CHECK IN
+            </button>
+
+        </form>
+
+
+        <p class="quick-checkin-note">
+            You can type the member ID and press Enter,
+            or scan the member's QR code.
+        </p>
+
+
+        <div
+            id="quickCheckinMessage"
+            class="scanner-message"
+        ></div>
+
+    </section>
+
+
+    <!-- ATTENDANCE HISTORY -->
+
+    <section class="dashboard-section">
+
+        <div class="section-header">
+
+            <div>
+
+                <h2>
+                    Attendance History
+                </h2>
+
+            </div>
 
             <p>
                 Recent member check-ins.
@@ -521,9 +561,7 @@ $attendanceHistory = $stmt->fetchAll();
 
         <div class="table-container">
 
-
             <table>
-
 
                 <thead>
 
@@ -531,13 +569,13 @@ $attendanceHistory = $stmt->fetchAll();
 
                         <th>ID</th>
 
-                        <th>Member</th>
+                        <th>MEMBER</th>
 
-                        <th>Membership</th>
+                        <th>MEMBERSHIP</th>
 
-                        <th>Date</th>
+                        <th>DATE</th>
 
-                        <th>Time</th>
+                        <th>TIME</th>
 
                     </tr>
 
@@ -546,93 +584,56 @@ $attendanceHistory = $stmt->fetchAll();
 
                 <tbody>
 
-
-                <?php if (count($attendanceHistory) > 0): ?>
-
-
-                    <?php foreach ($attendanceHistory as $record): ?>
-
-
-                        <tr>
-
-
-                            <td>
-                                #<?= htmlspecialchars($record["id"]) ?>
-                            </td>
-
-
-                            <td>
-
-                                <strong>
-                                    <?= htmlspecialchars($record["full_name"]) ?>
-                                </strong>
-
-                                <small>
-                                    Member #<?= htmlspecialchars($record["member_id"]) ?>
-                                </small>
-
-                            </td>
-
-
-                            <td>
-                                <?= htmlspecialchars($record["membership_plan"]) ?>
-                            </td>
-
-
-                            <td>
-
-                                <?= date(
-                                    "M d, Y",
-                                    strtotime($record["attendance_date"])
-                                ) ?>
-
-                            </td>
-
-
-                            <td>
-
-                                <?= date(
-                                    "h:i A",
-                                    strtotime($record["attendance_time"])
-                                ) ?>
-
-                            </td>
-
-
-                        </tr>
-
-
-                    <?php endforeach; ?>
-
-
-                <?php else: ?>
-
+                <?php if (empty($attendanceHistory)): ?>
 
                     <tr>
 
                         <td
                             colspan="5"
-                            class="empty-table"
+                            style="text-align:center;"
                         >
-
                             No attendance records yet.
-
                         </td>
 
                     </tr>
 
+                <?php else: ?>
+
+                    <?php foreach ($attendanceHistory as $record): ?>
+
+                        <tr>
+
+                            <td>
+                                <?= htmlspecialchars($record["id"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($record["full_name"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($record["membership_plan"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($record["attendance_date"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($record["attendance_time"]) ?>
+                            </td>
+
+                        </tr>
+
+                    <?php endforeach; ?>
 
                 <?php endif; ?>
 
-
                 </tbody>
-
 
             </table>
 
-
         </div>
-
 
     </section>
 
@@ -640,6 +641,409 @@ $attendanceHistory = $stmt->fetchAll();
 </main>
 
 
-</body>
+<!-- =====================================================
+     QR SCANNER MODAL
+===================================================== -->
 
+<div
+    id="scannerModal"
+    class="scanner-modal"
+>
+
+    <div class="scanner-box">
+
+        <div class="scanner-header">
+
+            <div>
+
+                <h2>
+                    Scan Member ID
+                </h2>
+
+                <p>
+                    Point the camera at the member's QR code.
+                </p>
+
+            </div>
+
+
+            <button
+                type="button"
+                id="closeScanner"
+                class="scanner-close"
+            >
+                ×
+            </button>
+
+        </div>
+
+
+        <div
+            id="qr-reader"
+            class="qr-reader"
+        ></div>
+
+
+        <div
+            id="scannerResult"
+            class="scanner-message"
+        ></div>
+
+    </div>
+
+</div>
+
+
+<!-- =====================================================
+     HTML5 QR CODE LIBRARY
+===================================================== -->
+
+<script src="https://unpkg.com/html5-qrcode"></script>
+
+
+<script>
+
+/*
+|--------------------------------------------------------------------------
+| ELEMENTS
+|--------------------------------------------------------------------------
+*/
+
+const quickCheckinForm =
+    document.getElementById("quickCheckinForm");
+
+const memberIdInput =
+    document.getElementById("memberIdInput");
+
+const quickCheckinMessage =
+    document.getElementById("quickCheckinMessage");
+
+const scannerModal =
+    document.getElementById("scannerModal");
+
+const openScanner =
+    document.getElementById("openScanner");
+
+const closeScanner =
+    document.getElementById("closeScanner");
+
+const scannerResult =
+    document.getElementById("scannerResult");
+
+let qrScanner = null;
+let scannerRunning = false;
+
+
+/*
+|--------------------------------------------------------------------------
+| CHECK IN USING AJAX
+|--------------------------------------------------------------------------
+*/
+
+function checkInMember(memberId, messageElement) {
+
+    memberId = memberId.trim();
+
+    if (memberId === "") {
+
+        messageElement.className =
+            "scanner-message error";
+
+        messageElement.textContent =
+            "Please enter a member ID.";
+
+        return;
+    }
+
+
+    const formData = new FormData();
+
+    formData.append(
+        "action",
+        "checkin"
+    );
+
+    formData.append(
+        "member_id",
+        memberId
+    );
+
+    formData.append(
+        "ajax",
+        "1"
+    );
+
+
+    fetch("index.php", {
+
+        method: "POST",
+
+        body: formData
+
+    })
+
+    .then(response => response.json())
+
+    .then(data => {
+
+        if (data.success) {
+
+            messageElement.className =
+                "scanner-message success";
+
+            messageElement.textContent =
+                data.message;
+
+            memberIdInput.value = "";
+
+            /*
+            | Refresh attendance table
+            */
+
+            setTimeout(() => {
+
+                window.location.reload();
+
+            }, 1000);
+
+        } else {
+
+            messageElement.className =
+                "scanner-message error";
+
+            messageElement.textContent =
+                data.message;
+
+        }
+
+    })
+
+    .catch(error => {
+
+        console.error(error);
+
+        messageElement.className =
+            "scanner-message error";
+
+        messageElement.textContent =
+            "Unable to process check-in.";
+
+    });
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MANUAL ID CHECK-IN
+|--------------------------------------------------------------------------
+*/
+
+quickCheckinForm.addEventListener(
+    "submit",
+    function(event) {
+
+        event.preventDefault();
+
+        checkInMember(
+            memberIdInput.value,
+            quickCheckinMessage
+        );
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| OPEN QR SCANNER
+|--------------------------------------------------------------------------
+*/
+
+openScanner.addEventListener(
+    "click",
+    function() {
+
+        scannerModal.classList.add("show");
+
+        scannerResult.textContent = "";
+
+        startScanner();
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| CLOSE QR SCANNER
+|--------------------------------------------------------------------------
+*/
+
+closeScanner.addEventListener(
+    "click",
+    function() {
+
+        stopScanner();
+
+        scannerModal.classList.remove("show");
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| CLICK OUTSIDE MODAL
+|--------------------------------------------------------------------------
+*/
+
+scannerModal.addEventListener(
+    "click",
+    function(event) {
+
+        if (event.target === scannerModal) {
+
+            stopScanner();
+
+            scannerModal.classList.remove("show");
+
+        }
+
+    }
+);
+
+
+/*
+|--------------------------------------------------------------------------
+| START SCANNER
+|--------------------------------------------------------------------------
+*/
+
+function startScanner() {
+
+    if (scannerRunning) {
+        return;
+    }
+
+    qrScanner = new Html5Qrcode(
+        "qr-reader"
+    );
+
+
+    qrScanner.start(
+
+        {
+            facingMode: "environment"
+        },
+
+        {
+            fps: 10,
+            qrbox: {
+                width: 250,
+                height: 250
+            }
+        },
+
+
+        function(decodedText) {
+
+            console.log(
+                "QR Code:",
+                decodedText
+            );
+
+
+            /*
+            | Stop scanner immediately
+            | after successful scan.
+            */
+
+            stopScanner();
+
+
+            /*
+            | Automatically check member in.
+            */
+
+            checkInMember(
+                decodedText,
+                scannerResult
+            );
+
+        },
+
+
+        function(errorMessage) {
+
+            /*
+            | Scanner continuously reports
+            | when it doesn't see a QR code.
+            |
+            | We intentionally don't display
+            | those messages.
+            */
+
+        }
+
+    )
+
+    .then(function() {
+
+        scannerRunning = true;
+
+    })
+
+    .catch(function(error) {
+
+        scannerResult.className =
+            "scanner-message error";
+
+        scannerResult.textContent =
+            "Unable to access the camera. Please allow camera permission.";
+
+        console.error(error);
+
+    });
+
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| STOP SCANNER
+|--------------------------------------------------------------------------
+*/
+
+function stopScanner() {
+
+    if (
+        qrScanner &&
+        scannerRunning
+    ) {
+
+        qrScanner.stop()
+
+            .then(function() {
+
+                qrScanner.clear();
+
+                scannerRunning = false;
+
+            })
+
+            .catch(function(error) {
+
+                console.error(error);
+
+                scannerRunning = false;
+
+            });
+
+    }
+
+}
+
+</script>
+
+</body>
 </html>

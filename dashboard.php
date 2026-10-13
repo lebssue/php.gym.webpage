@@ -5,76 +5,253 @@ require_once "config/database.php";
 
 $pageTitle = "Dashboard";
 
+/*
+|--------------------------------------------------------------------------
+| DASHBOARD STATISTICS
+|--------------------------------------------------------------------------
+*/
 
-// ========================================
-// TOTAL MEMBERS
-// ========================================
-
+// Total members
 $stmt = $pdo->query("SELECT COUNT(*) FROM members");
 $totalMembers = $stmt->fetchColumn();
 
-
-// ========================================
-// ACTIVE MEMBERS
-// ========================================
-
+// Active members
 $stmt = $pdo->query("
     SELECT COUNT(*)
     FROM members
     WHERE expiration_date >= CURDATE()
 ");
-
 $activeMembers = $stmt->fetchColumn();
 
-
-// ========================================
-// EXPIRED MEMBERS
-// ========================================
-
+// Expired members
 $stmt = $pdo->query("
     SELECT COUNT(*)
     FROM members
     WHERE expiration_date < CURDATE()
 ");
-
 $expiredMembers = $stmt->fetchColumn();
 
-
-// ========================================
-// TODAY'S ATTENDANCE
-// ========================================
-
+// Today's attendance
 $stmt = $pdo->query("
     SELECT COUNT(*)
     FROM attendance
     WHERE attendance_date = CURDATE()
 ");
-
 $todayAttendance = $stmt->fetchColumn();
 
-
-// ========================================
-// TOTAL PAYMENTS
-// ========================================
-
+// Total payments
 $stmt = $pdo->query("
     SELECT COALESCE(SUM(amount), 0)
     FROM payments
 ");
-
 $totalPayments = $stmt->fetchColumn();
 
 
-// ========================================
-// RECENT MEMBERS
-// ========================================
+/*
+|--------------------------------------------------------------------------
+| SALES GRAPH
+|--------------------------------------------------------------------------
+|
+| Default graph = last 7 days
+|
+*/
+
+$graphPeriod = $_GET["period"] ?? "daily";
+
+$allowedPeriods = ["daily", "weekly", "monthly", "yearly"];
+
+if (!in_array($graphPeriod, $allowedPeriods)) {
+    $graphPeriod = "daily";
+}
+
+$graphLabels = [];
+$graphValues = [];
+
+
+/*
+|--------------------------------------------------------------------------
+| DAILY
+|--------------------------------------------------------------------------
+|
+| Shows the last 7 days.
+|
+*/
+
+if ($graphPeriod === "daily") {
+
+    for ($i = 6; $i >= 0; $i--) {
+
+        $date = date(
+            "Y-m-d",
+            strtotime("-$i days")
+        );
+
+        $label = date(
+            "D",
+            strtotime($date)
+        );
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM payments
+            WHERE payment_date = ?
+        ");
+
+        $stmt->execute([$date]);
+
+        $revenue = $stmt->fetchColumn();
+
+        $graphLabels[] = $label;
+        $graphValues[] = (float)$revenue;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| WEEKLY
+|--------------------------------------------------------------------------
+|
+| Shows the last 8 weeks.
+|
+*/
+
+elseif ($graphPeriod === "weekly") {
+
+    for ($i = 7; $i >= 0; $i--) {
+
+        $startDate = date(
+            "Y-m-d",
+            strtotime("monday -$i week")
+        );
+
+        $endDate = date(
+            "Y-m-d",
+            strtotime("$startDate +6 days")
+        );
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM payments
+            WHERE payment_date BETWEEN ? AND ?
+        ");
+
+        $stmt->execute([
+            $startDate,
+            $endDate
+        ]);
+
+        $revenue = $stmt->fetchColumn();
+
+        $graphLabels[] = date(
+            "M d",
+            strtotime($startDate)
+        );
+
+        $graphValues[] = (float)$revenue;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| MONTHLY
+|--------------------------------------------------------------------------
+|
+| Shows the last 12 months.
+|
+*/
+
+elseif ($graphPeriod === "monthly") {
+
+    for ($i = 11; $i >= 0; $i--) {
+
+        $monthDate = date(
+            "Y-m-01",
+            strtotime("-$i months")
+        );
+
+        $startDate = date(
+            "Y-m-01",
+            strtotime($monthDate)
+        );
+
+        $endDate = date(
+            "Y-m-t",
+            strtotime($monthDate)
+        );
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM payments
+            WHERE payment_date BETWEEN ? AND ?
+        ");
+
+        $stmt->execute([
+            $startDate,
+            $endDate
+        ]);
+
+        $revenue = $stmt->fetchColumn();
+
+        $graphLabels[] = date(
+            "M",
+            strtotime($monthDate)
+        );
+
+        $graphValues[] = (float)$revenue;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| YEARLY
+|--------------------------------------------------------------------------
+|
+| Shows the last 5 years.
+|
+*/
+
+elseif ($graphPeriod === "yearly") {
+
+    for ($i = 4; $i >= 0; $i--) {
+
+        $year = date(
+            "Y",
+            strtotime("-$i years")
+        );
+
+        $startDate = $year . "-01-01";
+        $endDate = $year . "-12-31";
+
+        $stmt = $pdo->prepare("
+            SELECT COALESCE(SUM(amount), 0)
+            FROM payments
+            WHERE payment_date BETWEEN ? AND ?
+        ");
+
+        $stmt->execute([
+            $startDate,
+            $endDate
+        ]);
+
+        $revenue = $stmt->fetchColumn();
+
+        $graphLabels[] = $year;
+        $graphValues[] = (float)$revenue;
+    }
+}
+
+
+/*
+|--------------------------------------------------------------------------
+| RECENT MEMBERS
+|--------------------------------------------------------------------------
+*/
 
 $stmt = $pdo->query("
-    SELECT
-        id,
-        full_name,
-        membership_plan,
-        expiration_date
+    SELECT *
     FROM members
     ORDER BY date_registered DESC
     LIMIT 5
@@ -85,208 +262,247 @@ $recentMembers = $stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
-
 <html lang="en">
 
 <head>
 
     <meta charset="UTF-8">
 
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <title>Dashboard | ONYX GYM</title>
+    <title>
+        Dashboard | ONYX GYM
+    </title>
 
-    <link rel="stylesheet" href="css/style.css">
+    <link
+        rel="stylesheet"
+        href="css/style.css"
+    >
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 </head>
 
-
 <body>
-
 
 <?php require_once "includes/sidebar.php"; ?>
 
 
 <main class="main-content">
 
+    <!-- HEADER -->
 
-    <!-- TOP HEADER -->
-
-    <header class="top-header">
+    <div class="page-header">
 
         <div>
-
-            <span class="page-label">
-                ONYX GYM
-            </span>
-
-            <h1>
-                Dashboard
-            </h1>
+            <h1>Dashboard</h1>
 
             <p>
                 Welcome back,
-                <strong>
-                    <?= htmlspecialchars($_SESSION["username"]) ?>
-                </strong>
+                <?= htmlspecialchars($_SESSION["username"]) ?>.
             </p>
-
         </div>
 
-    </header>
-
+    </div>
 
 
     <!-- STATISTICS -->
 
-    <section class="stats-grid">
-
+    <div class="stats-grid">
 
         <!-- TOTAL MEMBERS -->
 
         <div class="stat-card">
 
-            <div class="stat-icon">
-                ♙
-            </div>
+            <div class="stat-info">
 
-            <div>
-
-                <p>
+                <span class="stat-label">
                     Total Members
-                </p>
+                </span>
 
-                <h2>
-                    <?= number_format($totalMembers) ?>
-                </h2>
+                <strong>
+                    <?= $totalMembers ?>
+                </strong>
 
             </div>
 
         </div>
-
 
 
         <!-- ACTIVE MEMBERS -->
 
         <div class="stat-card">
 
-            <div class="stat-icon">
-                ✓
-            </div>
+            <div class="stat-info">
 
-            <div>
-
-                <p>
+                <span class="stat-label">
                     Active Members
-                </p>
+                </span>
 
-                <h2>
-                    <?= number_format($activeMembers) ?>
-                </h2>
+                <strong>
+                    <?= $activeMembers ?>
+                </strong>
 
             </div>
 
         </div>
-
 
 
         <!-- EXPIRED MEMBERS -->
 
         <div class="stat-card">
 
-            <div class="stat-icon">
-                !
-            </div>
+            <div class="stat-info">
 
-            <div>
-
-                <p>
+                <span class="stat-label">
                     Expired Members
-                </p>
+                </span>
 
-                <h2>
-                    <?= number_format($expiredMembers) ?>
-                </h2>
+                <strong>
+                    <?= $expiredMembers ?>
+                </strong>
 
             </div>
 
         </div>
-
 
 
         <!-- TODAY ATTENDANCE -->
 
         <div class="stat-card">
 
-            <div class="stat-icon">
-                ↗
-            </div>
+            <div class="stat-info">
 
-            <div>
-
-                <p>
+                <span class="stat-label">
                     Today's Attendance
-                </p>
+                </span>
 
-                <h2>
-                    <?= number_format($todayAttendance) ?>
-                </h2>
+                <strong>
+                    <?= $todayAttendance ?>
+                </strong>
 
             </div>
 
         </div>
-
 
 
         <!-- TOTAL PAYMENTS -->
 
-        <div class="stat-card payment-card">
+        <div class="stat-card">
 
-            <div class="stat-icon">
-                ₱
-            </div>
+            <div class="stat-info">
 
-            <div>
-
-                <p>
+                <span class="stat-label">
                     Total Payments
-                </p>
+                </span>
 
-                <h2>
+                <strong>
                     ₱<?= number_format($totalPayments, 2) ?>
-                </h2>
+                </strong>
 
             </div>
 
         </div>
 
-
-    </section>
-
+    </div>
 
 
-    <!-- RECENT MEMBERS -->
+    <!-- SALES GRAPH -->
 
-    <section class="dashboard-section">
-
+    <section class="dashboard-section sales-section">
 
         <div class="section-header">
 
             <div>
 
                 <h2>
-                    Recently Registered Members
+                    Sales Overview
                 </h2>
 
                 <p>
-                    Latest members added to the system.
+                    Revenue collected from gym payments.
                 </p>
 
             </div>
 
 
+            <!-- GRAPH FILTER -->
+
+            <form method="GET" class="sales-filter">
+
+                <select
+                    name="period"
+                    onchange="this.form.submit()"
+                >
+
+                    <option
+                        value="daily"
+                        <?= $graphPeriod === "daily" ? "selected" : "" ?>
+                    >
+                        Daily
+                    </option>
+
+                    <option
+                        value="weekly"
+                        <?= $graphPeriod === "weekly" ? "selected" : "" ?>
+                    >
+                        Weekly
+                    </option>
+
+                    <option
+                        value="monthly"
+                        <?= $graphPeriod === "monthly" ? "selected" : "" ?>
+                    >
+                        Monthly
+                    </option>
+
+                    <option
+                        value="yearly"
+                        <?= $graphPeriod === "yearly" ? "selected" : "" ?>
+                    >
+                        Yearly
+                    </option>
+
+                </select>
+
+            </form>
+
+        </div>
+
+
+        <div class="sales-chart-container">
+
+            <canvas id="salesChart"></canvas>
+
+        </div>
+
+    </section>
+
+
+    <!-- RECENT MEMBERS -->
+
+    <section class="dashboard-section">
+
+        <div class="section-header">
+
+            <div>
+
+                <h2>
+                    Recent Members
+                </h2>
+
+                <p>
+                    Latest registered gym members.
+                </p>
+
+            </div>
+
             <a
-                href="/onyx-gym/members/index.php"
+                href="members/index.php"
                 class="view-all"
             >
                 View All
@@ -295,9 +511,7 @@ $recentMembers = $stmt->fetchAll();
         </div>
 
 
-
         <div class="table-container">
-
 
             <table>
 
@@ -305,21 +519,13 @@ $recentMembers = $stmt->fetchAll();
 
                     <tr>
 
-                        <th>
-                            Member
-                        </th>
+                        <th>ID</th>
 
-                        <th>
-                            Membership
-                        </th>
+                        <th>Member</th>
 
-                        <th>
-                            Status
-                        </th>
+                        <th>Membership</th>
 
-                        <th>
-                            Expiration
-                        </th>
+                        <th>Expiration</th>
 
                     </tr>
 
@@ -328,114 +534,232 @@ $recentMembers = $stmt->fetchAll();
 
                 <tbody>
 
-
-                <?php if (count($recentMembers) > 0): ?>
-
-
-                    <?php foreach ($recentMembers as $member): ?>
-
-
-                        <?php
-
-                        $status =
-                            $member["expiration_date"] >= date("Y-m-d")
-                            ? "ACTIVE"
-                            : "EXPIRED";
-
-                        ?>
-
-
-                        <tr>
-
-
-                            <td>
-
-                                <strong>
-                                    <?= htmlspecialchars($member["full_name"]) ?>
-                                </strong>
-
-                                <small>
-                                    ID #<?= htmlspecialchars($member["id"]) ?>
-                                </small>
-
-                            </td>
-
-
-                            <td>
-
-                                <?= htmlspecialchars($member["membership_plan"]) ?>
-
-                            </td>
-
-
-                            <td>
-
-
-                                <?php if ($status === "ACTIVE"): ?>
-
-                                    <span class="status active">
-                                        ACTIVE
-                                    </span>
-
-                                <?php else: ?>
-
-                                    <span class="status expired">
-                                        EXPIRED
-                                    </span>
-
-                                <?php endif; ?>
-
-
-                            </td>
-
-
-                            <td>
-
-                                <?= date(
-                                    "M d, Y",
-                                    strtotime($member["expiration_date"])
-                                ) ?>
-
-                            </td>
-
-
-                        </tr>
-
-
-                    <?php endforeach; ?>
-
-
-                <?php else: ?>
-
+                <?php if (empty($recentMembers)): ?>
 
                     <tr>
 
                         <td
                             colspan="4"
-                            class="empty-table"
+                            style="text-align:center;"
                         >
                             No members registered yet.
                         </td>
 
                     </tr>
 
+                <?php else: ?>
+
+                    <?php foreach ($recentMembers as $member): ?>
+
+                        <tr>
+
+                            <td>
+                                <?= htmlspecialchars($member["id"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($member["full_name"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($member["membership_plan"]) ?>
+                            </td>
+
+                            <td>
+                                <?= htmlspecialchars($member["expiration_date"]) ?>
+                            </td>
+
+                        </tr>
+
+                    <?php endforeach; ?>
 
                 <?php endif; ?>
-
 
                 </tbody>
 
             </table>
 
-
         </div>
-
 
     </section>
 
 
 </main>
 
+
+<script>
+
+/*
+|--------------------------------------------------------------------------
+| SALES GRAPH DATA
+|--------------------------------------------------------------------------
+*/
+
+const salesLabels =
+    <?= json_encode($graphLabels) ?>;
+
+const salesValues =
+    <?= json_encode($graphValues) ?>;
+
+
+/*
+|--------------------------------------------------------------------------
+| CREATE SALES CHART
+|--------------------------------------------------------------------------
+*/
+
+const salesCanvas =
+    document.getElementById("salesChart");
+
+if (salesCanvas) {
+
+    new Chart(
+        salesCanvas,
+        {
+
+            type: "line",
+
+            data: {
+
+                labels: salesLabels,
+
+                datasets: [
+
+                    {
+
+                        label: "Revenue",
+
+                        data: salesValues,
+
+                        borderColor: "#e5b82e",
+
+                        backgroundColor:
+                            "rgba(229, 184, 46, 0.10)",
+
+                        borderWidth: 2,
+
+                        tension: 0.35,
+
+                        fill: true,
+
+                        pointBackgroundColor:
+                            "#e5b82e",
+
+                        pointBorderColor:
+                            "#111111",
+
+                        pointBorderWidth: 2,
+
+                        pointRadius: 4,
+
+                        pointHoverRadius: 6
+
+                    }
+
+                ]
+
+            },
+
+
+            options: {
+
+                responsive: true,
+
+                maintainAspectRatio: false,
+
+                plugins: {
+
+                    legend: {
+
+                        display: false
+
+                    },
+
+                    tooltip: {
+
+                        callbacks: {
+
+                            label: function(context) {
+
+                                return " ₱" +
+                                    Number(
+                                        context.raw
+                                    ).toLocaleString(
+                                        "en-PH",
+                                        {
+                                            minimumFractionDigits: 2,
+                                            maximumFractionDigits: 2
+                                        }
+                                    );
+
+                            }
+
+                        }
+
+                    }
+
+                },
+
+
+                scales: {
+
+                    x: {
+
+                        grid: {
+
+                            color:
+                                "rgba(255,255,255,0.05)"
+
+                        },
+
+                        ticks: {
+
+                            color: "#888"
+
+                        }
+
+                    },
+
+
+                    y: {
+
+                        beginAtZero: true,
+
+                        grid: {
+
+                            color:
+                                "rgba(255,255,255,0.05)"
+
+                        },
+
+                        ticks: {
+
+                            color: "#888",
+
+                            callback: function(value) {
+
+                                return "₱" +
+                                    Number(value)
+                                    .toLocaleString(
+                                        "en-PH"
+                                    );
+
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        }
+    );
+
+}
+
+</script>
 
 </body>
 

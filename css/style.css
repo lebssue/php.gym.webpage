@@ -1435,3 +1435,429 @@ tbody tr:hover {
     }
 
 }
+/* =========================================================
+   DASHBOARD SALES GRAPH
+   ========================================================= */
+
+.sales-section {
+    margin-top: 25px;
+}
+
+.sales-filter select {
+    background: #0b0b0b;
+    color: #ffffff;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 9px 35px 9px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+}
+
+.sales-filter select:focus {
+    border-color: #e5b82e;
+}
+
+.sales-filter option {
+    background: #111111;
+    color: #ffffff;
+}
+
+.sales-chart-container {
+    position: relative;
+    width: 100%;
+    height: 330px;
+    margin-top: 20px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 600px) {
+
+    .sales-chart-container {
+        height: 250px;
+    }
+
+    .section-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+}
+/* =========================================================
+   ATTENDANCE QUICK CHECK-IN
+   ========================================================= */
+
+.quick-checkin-section {
+    margin-top: 15px;
+}
+
+.quick-checkin-form {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+    margin-top: 5px;
+}
+
+.quick-checkin-form input {
+    flex: 1;
+    background: #0b0b0b;
+    color: #ffffff;
+    border: 1px solid #333333;
+    border-radius: 6px;
+    padding: 13px 14px;
+    font-size: 14px;
+    outline: none;
+}
+
+.quick-checkin-form input:focus {
+    border-color: #e5b82e;
+}
+
+.quick-checkin-form input::placeholder {
+    color: #666666;
+}
+
+
+/* SCAN BUTTON */
+
+.scan-id-button {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    background: #e5b82e;
+    color: #111111;
+
+    border: none;
+    border-radius: 6px;
+
+    padding: 11px 16px;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+.scan-id-button:hover {
+    background: #f0c43d;
+    transform: translateY(-1px);
+}
+
+
+/* CHECK-IN BUTTON */
+
+.checkin-button {
+    background: #e5b82e;
+    color: #111111;
+
+    border: none;
+    border-radius: 6px;
+
+    padding: 12px 18px;
+
+    font-size: 13px;
+    font-weight: bold;
+
+    cursor: pointer;
+
+    transition: 0.2s;
+}
+
+.checkin-button:hover {
+    background: #f0c43d;
+}
+
+
+/* QUICK CHECK-IN NOTE */
+
+.quick-checkin-note {
+    margin-top: 10px;
+
+    color: #666666;
+
+    font-size: 12px;
+}
+
+
+/* MESSAGES */
+
+.attendance-message,
+.scanner-message {
+    padding: 12px 15px;
+
+    border-radius: 6px;
+
+    margin-bottom: 15px;
+
+    font-size: 13px;
+}
+
+.attendance-message.success,
+.scanner-message.success {
+    background: rgba(70, 180, 100, 0.10);
+    border: 1px solid rgba(70, 180, 100, 0.30);
+    color: #75d98c;
+}
+
+.attendance-message.error,
+.scanner-message.error {
+    background: rgba(220, 70, 70, 0.10);
+    border: 1px solid rgba(220, 70, 70, 0.30);
+    color: #ff7777;
+}
+
+
+/* SEARCH FORM */
+
+.attendance-search-form {
+    display: flex;
+    gap: 10px;
+
+    width: 100%;
+}
+
+.attendance-search-form input {
+    flex: 1;
+
+    background: #0b0b0b;
+    color: #ffffff;
+
+    border: 1px solid #333333;
+    border-radius: 6px;
+
+    padding: 13px 14px;
+
+    font-size: 14px;
+
+    outline: none;
+}
+
+.attendance-search-form input:focus {
+    border-color: #e5b82e;
+}
+
+.attendance-search-button {
+    background: #1d1d1d;
+    color: #e5b82e;
+
+    border: 1px solid #333333;
+
+    border-radius: 6px;
+
+    padding: 12px 20px;
+
+    font-weight: bold;
+
+    cursor: pointer;
+}
+
+.attendance-search-button:hover {
+    border-color: #e5b82e;
+}
+
+
+/* SEARCH RESULTS */
+
+.attendance-search-results {
+    margin-top: 20px;
+}
+
+.member-checkin-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+
+    background: #0d0d0d;
+
+    border: 1px solid #292929;
+    border-radius: 6px;
+
+    padding: 15px 18px;
+
+    margin-bottom: 8px;
+}
+
+.member-checkin-card > div:first-child {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.member-checkin-card strong {
+    color: #ffffff;
+}
+
+.member-checkin-card span {
+    color: #777777;
+    font-size: 12px;
+}
+
+.member-checkin-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.attendance-status {
+    font-size: 11px !important;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.attendance-status.active {
+    color: #75d98c !important;
+}
+
+.attendance-status.expired {
+    color: #ff7777 !important;
+}
+
+
+/* =========================================================
+   QR SCANNER MODAL
+   ========================================================= */
+
+.scanner-modal {
+    position: fixed;
+
+    inset: 0;
+
+    background: rgba(0, 0, 0, 0.80);
+
+    display: none;
+
+    align-items: center;
+    justify-content: center;
+
+    z-index: 9999;
+
+    padding: 20px;
+}
+
+.scanner-modal.show {
+    display: flex;
+}
+
+.scanner-box {
+    width: 100%;
+    max-width: 500px;
+
+    background: #111111;
+
+    border: 1px solid #333333;
+    border-radius: 10px;
+
+    padding: 25px;
+
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.scanner-header {
+    display: flex;
+
+    justify-content: space-between;
+    align-items: flex-start;
+
+    margin-bottom: 20px;
+}
+
+.scanner-header h2 {
+    color: #ffffff;
+    margin: 0 0 6px;
+}
+
+.scanner-header p {
+    color: #777777;
+    margin: 0;
+
+    font-size: 13px;
+}
+
+.scanner-close {
+    background: none;
+
+    border: none;
+
+    color: #888888;
+
+    font-size: 28px;
+
+    cursor: pointer;
+
+    line-height: 1;
+}
+
+.scanner-close:hover {
+    color: #ffffff;
+}
+
+
+/* QR CAMERA */
+
+.qr-reader {
+    width: 100%;
+
+    overflow: hidden;
+
+    border-radius: 8px;
+
+    background: #050505;
+}
+
+.qr-reader video {
+    border-radius: 8px;
+}
+
+
+/* SCANNER MESSAGE */
+
+.scanner-message {
+    margin-top: 15px;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 600px) {
+
+    .quick-checkin-form {
+        flex-direction: column;
+    }
+
+    .scan-id-button {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .attendance-search-form {
+        flex-direction: column;
+    }
+
+    .attendance-search-button {
+        width: 100%;
+    }
+
+    .member-checkin-card {
+        flex-direction: column;
+        align-items: flex-start;
+
+        gap: 15px;
+    }
+
+    .member-checkin-card > div:first-child {
+        flex-wrap: wrap;
+        gap: 8px 15px;
+    }
+
+    .member-checkin-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+}
